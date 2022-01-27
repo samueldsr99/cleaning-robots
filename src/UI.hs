@@ -9,8 +9,26 @@ import Control.Monad (when)
 import Data.List (find)
 import Data.Maybe (fromJust, fromMaybe, isNothing)
 import qualified Data.Maybe
-import Types (Child (..), Corral (Corral), Dirt (Dirt), Environment (..), Obstacle (Obstacle), Robot (..))
-import Utils (getChildrenPositions, getDirtPositions, getRobotsPositions, robotInCell)
+import Env (childActions, randomChildAction)
+import System.Random
+import Types
+  ( Child (..),
+    Corral (Corral),
+    Dirt (Dirt),
+    Environment (..),
+    Obstacle (Obstacle),
+    Robot (..),
+  )
+import Utils
+  ( getChildInCell,
+    getChildrenPositions,
+    getCorralInCell,
+    getDirtInCell,
+    getDirtPositions,
+    getObstacleInCell,
+    getRobotInCell,
+    getRobotsPositions,
+  )
 
 clearScreen :: IO ()
 clearScreen = putStr "\ESC[2J"
@@ -19,7 +37,7 @@ showRobot :: Maybe Robot -> String
 showRobot robot =
   if isNothing robot
     then ""
-    else "R" ++ show (idx $ fromJust robot)
+    else "R"
 
 showChild :: Maybe Child -> String
 showChild child =
@@ -47,11 +65,11 @@ showObstacle obstacle =
 
 showValueOfCell :: Environment -> Int -> Int -> String
 showValueOfCell env r c =
-  let robotInCell = find (\Robot {position = pos} -> (r, c) == pos) (robots env)
-      childInCell = find (\(Child x y) -> (r, c) == (x, y)) (children env)
-      dirtInCell = find (\(Dirt x y) -> (r, c) == (x, y)) (dirt env)
-      corralInCell = find (\(Corral x y) -> (r, c) == (x, y)) (corrals env)
-      obstacleInCell = find (\(Obstacle x y) -> (r, c) == (x, y)) (obstacles env)
+  let robotInCell = getRobotInCell env r c
+      childInCell = getChildInCell env r c
+      dirtInCell = getDirtInCell env r c
+      corralInCell = getCorralInCell env r c
+      obstacleInCell = getObstacleInCell env r c
 
       cellStr =
         showRobot robotInCell
@@ -90,3 +108,4 @@ printEnvironment env = do
   printRows 0 env
 
   print env
+  print $ randomChildAction env (head (children env)) (mkStdGen 21933)

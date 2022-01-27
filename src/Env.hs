@@ -1,10 +1,14 @@
 -- Module for handling States & Transitions
-module Env (genInitialState) where
+module Env where
 
 import Control.Monad (replicateM)
+import Data.Maybe (fromJust, fromMaybe, isJust, isNothing)
+import System.Random (Random (randomR), StdGen, mkStdGen)
 import Types
   ( Child (Child),
+    ChildAction (..),
     Corral (Corral),
+    Direction (..),
     Dirt (Dirt),
     Environment (..),
     Obstacle (Obstacle),
@@ -12,13 +16,19 @@ import Types
     Robot (..),
   )
 import Utils
-  ( getChildrenPositions,
+  ( adjacentCell,
+    childActionToDirection,
+    getChildrenPositions,
     getCorralsPositions,
     getDirtPositions,
     getRandomCellsInSquare,
     getRandomCellsInSquareNotContaining,
     getRobotsPositions,
+    isCellFree,
+    replace,
   )
+
+-- Initial State generations
 
 genInitialRobots :: Int -> Int -> Int -> Int -> [Robot]
 genInitialRobots n m robotsAmount seed =
@@ -96,3 +106,41 @@ genInitialState n m childrenAmount robotsAmount obstaclesAmount dirtAmount seed 
           corrals = corrals,
           obstacles = obstacles
         }
+
+-- Available actions for a child in the environment
+childActions :: Environment -> Child -> [ChildAction]
+childActions env (Child r c) =
+  [ x
+    | x <- [CUp, CRight, CDown, CLeft],
+      let adj = adjacentCell env (r, c) (fromJust $ childActionToDirection x) in isJust adj
+  ]
+
+randomChildAction :: Environment -> Child -> StdGen -> (ChildAction, StdGen)
+randomChildAction env child gen =
+  let actions = CStay : childActions env child
+      (r, newGen) = randomR (0, length actions - 1) gen :: (Int, StdGen)
+   in (actions !! r, newGen)
+
+moveChildRandomly :: Environment -> Int -> StdGen -> (Environment, StdGen)
+moveChildRandomly env index gen =
+  let child = children env !! index
+      (action, newGen) = randomChildAction env child gen
+   in if action == CStay
+        then (env, newGen)
+        else
+          let direction = fromJust $ childActionToDirection action
+              childPos = (\(Child x y) -> (x, y)) child
+              (newR, newC) = fromJust $ adjacentCell env childPos direction
+              newChild = Child newR newC
+           in (env {children = replace index (children env) newChild}, newGen)
+
+_moveChildrenRandomly :: Environment -> Int -> StdGen -> (Environment, StdGen)
+_moveChildrenRandomly env cur gen =
+  if cur == childrenAmount env
+    then (env, gen)
+    else
+      let (newEnv, newGen) = moveChildRandomly env cur gen
+       in _moveChildrenRandomly newEnv (cur + 1) newGen
+
+moveChildrenRandomly :: Environment -> StdGen -> (Environment, StdGen)
+moveChildrenRandomly env = _moveChildrenRandomly env 0

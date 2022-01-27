@@ -10,7 +10,7 @@ m :: Int
 m = 5
 
 children :: Int
-children = 3
+children = 1
 
 robots :: Int
 robots = 2
@@ -19,7 +19,7 @@ seed :: Int
 seed = 79
 
 obstacles :: Int
-obstacles = 0
+obstacles = 3
 
 dirt :: Int
 dirt = 2

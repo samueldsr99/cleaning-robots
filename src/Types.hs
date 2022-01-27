@@ -7,6 +7,8 @@ module Types
     Dirt (Dirt),
     Corral (Corral),
     Obstacle (Obstacle),
+    ChildAction (..),
+    Direction (..),
   )
 where
 
@@ -40,3 +42,9 @@ data Environment = Environment
     obstacles :: [Obstacle]
   }
   deriving (Show)
+
+data Direction = DUp | DRight | DLeft | DDown deriving (Show, Eq)
+
+data ChildAction = CUp | CRight | CDown | CLeft | CStay deriving (Show, Eq)
+
+data RobotAction = RUp | RRight | RDown | RLeft | RStay deriving (Show, Eq)
