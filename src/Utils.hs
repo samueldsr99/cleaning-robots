@@ -100,8 +100,8 @@ isCellInRange :: Int -> Int -> Environment -> Bool
 isCellInRange r c Environment {n = n, m = m} =
   r >= 0 && r < n && c >= 0 && c < m
 
-isCellFree :: Int -> Int -> Environment -> Bool
-isCellFree r c env =
+isCellFree :: (Int, Int) -> Environment -> Bool
+isCellFree (r, c) env =
   let robotInCell = getRobotInCell env r c
       childInCell = getChildInCell env r c
       dirtInCell = getDirtInCell env r c
@@ -114,12 +114,25 @@ isCellFree r c env =
         && isNothing corralInCell
         && isNothing obstacleInCell
 
+-- A child can move if cell is not occupied by Robot | Child | Dirt | Corral
+childCanVisitCell :: (Int, Int) -> Environment -> Bool
+childCanVisitCell (r, c) env =
+  let robotInCell = getRobotInCell env r c
+      childInCell = getChildInCell env r c
+      dirtInCell = getDirtInCell env r c
+      corralInCell = getCorralInCell env r c
+   in isCellInRange r c env
+        && isNothing robotInCell
+        && isNothing childInCell
+        && isNothing dirtInCell
+        && isNothing corralInCell
+
 adjacentCell :: Environment -> (Int, Int) -> Direction -> Maybe (Int, Int)
 adjacentCell env (r, c) dir
-  | dir == DUp && isCellFree (r - 1) c env = Just (r - 1, c)
-  | dir == DRight && isCellFree r (c + 1) env = Just (r, c + 1)
-  | dir == DDown && isCellFree (r + 1) c env = Just (r + 1, c)
-  | dir == DLeft && isCellFree r (c - 1) env = Just (r, c - 1)
+  | dir == DUp = Just (r - 1, c)
+  | dir == DRight = Just (r, c + 1)
+  | dir == DDown = Just (r + 1, c)
+  | dir == DLeft = Just (r, c - 1)
   | otherwise = Nothing
 
 childActionToDirection :: ChildAction -> Maybe Direction

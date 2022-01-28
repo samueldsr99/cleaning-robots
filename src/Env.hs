@@ -18,6 +18,7 @@ import Types
 import Utils
   ( adjacentCell,
     childActionToDirection,
+    childCanVisitCell,
     getChildrenPositions,
     getCorralsPositions,
     getDirtPositions,
@@ -112,7 +113,8 @@ childActions :: Environment -> Child -> [ChildAction]
 childActions env (Child r c) =
   [ x
     | x <- [CUp, CRight, CDown, CLeft],
-      let adj = adjacentCell env (r, c) (fromJust $ childActionToDirection x) in isJust adj
+      let pos = adjacentCell env (r, c) (fromJust $ childActionToDirection x)
+       in isJust pos && childCanVisitCell (fromJust pos) env
   ]
 
 randomChildAction :: Environment -> Child -> StdGen -> (ChildAction, StdGen)
