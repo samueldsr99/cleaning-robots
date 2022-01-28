@@ -2,7 +2,7 @@
 module Simulation (simulate) where
 
 import Env (genInitialState, moveChildRandomly, moveChildrenRandomly)
-import System.Random
+import System.Random (StdGen, mkStdGen)
 import Types (Environment)
 import UI (clearScreen, printEnvironment)
 import Utils (getRandomCellsInSquareNotContaining)

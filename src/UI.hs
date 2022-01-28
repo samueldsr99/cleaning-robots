@@ -10,7 +10,7 @@ import Data.List (find)
 import Data.Maybe (fromJust, fromMaybe, isNothing)
 import qualified Data.Maybe
 import Env (childActions, randomChildAction)
-import System.Random
+import System.Random ()
 import Types
   ( Child (..),
     Corral (Corral),
