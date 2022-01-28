@@ -46,7 +46,7 @@ genInitialRobots n m robotsAmount seed =
             { idx = idx,
               rtype = "A",
               position = pos,
-              loadingChild = False
+              loadingChild = Nothing
             }
           | (pos, idx) <- zip robotPositions [1 .. robotsAmount]
         ]

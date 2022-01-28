@@ -148,6 +148,7 @@ canMoveChild (env, index) direction =
                      then Nothing
                      else findIndex (\o -> o == fromJust obstacleInCell) (obstacles env)
               in isCellInRange r c env
+                   && not (childIsLoaded env index)
                    && isNothing robotInCell
                    && isNothing childInCell
                    && isNothing dirtInCell
@@ -233,3 +234,13 @@ _randomlyTake curList (x : xs) prob gen =
 
 randomlyTake :: [a] -> Double -> StdGen -> ([a], StdGen)
 randomlyTake = _randomlyTake []
+
+-- Check if an element exists in an iterable
+exists :: (Eq a) => a -> [a] -> Bool
+exists _ [] = False
+exists e (x : xs) = (e == x) || exists e xs
+
+-- Check whether the child is loaded by a robot given it's child index
+childIsLoaded :: Environment -> Int -> Bool
+childIsLoaded Environment {robots = robots} index =
+  exists (Just index) (map loadingChild robots)

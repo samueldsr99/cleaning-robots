@@ -18,7 +18,7 @@ data Robot = Robot
   { idx :: Int,
     rtype :: String,
     position :: (Int, Int),
-    loadingChild :: Bool
+    loadingChild :: Maybe Int
   }
   deriving (Show)
 
