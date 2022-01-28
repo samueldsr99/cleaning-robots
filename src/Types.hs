@@ -22,13 +22,13 @@ data Robot = Robot
   }
   deriving (Show)
 
-data Dirt = Dirt Int Int deriving (Show)
+data Dirt = Dirt Int Int deriving (Eq, Show)
 
-data Child = Child Int Int deriving (Show)
+data Child = Child Int Int deriving (Eq, Show)
 
-data Corral = Corral Int Int deriving (Show)
+data Corral = Corral Int Int deriving (Eq, Show)
 
-data Obstacle = Obstacle Int Int deriving (Show)
+data Obstacle = Obstacle Int Int deriving (Eq, Show)
 
 data Environment = Environment
   { n :: Int,

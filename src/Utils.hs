@@ -2,8 +2,8 @@
 module Utils where
 
 import Data.Dynamic (Dynamic)
-import Data.List (find)
-import Data.Maybe (isNothing)
+import Data.List (find, findIndex)
+import Data.Maybe (fromJust, isJust, isNothing)
 import System.Random
   ( Random (random, randomR),
     StdGen,
@@ -114,18 +114,46 @@ isCellFree (r, c) env =
         && isNothing corralInCell
         && isNothing obstacleInCell
 
+-- Check if child can move obstacle in a direction given the obstacle index
+canMoveObstacle :: (Environment, Int) -> Direction -> Bool
+canMoveObstacle (env, index) direction =
+  let obstacle = obstacles env !! index
+      obstaclePosition = (\(Obstacle r c) -> (r, c)) obstacle
+      newCell = adjacentCell env obstaclePosition direction
+      obstacleIndexInCell =
+        if isNothing newCell
+          then Nothing
+          else findIndex (\(Obstacle oR oC) -> (oR, oC) == fromJust newCell) (obstacles env)
+   in isJust newCell
+        && ( isCellFree (fromJust newCell) env
+               || ( isJust obstacleIndexInCell && canMoveObstacle (env, fromJust obstacleIndexInCell) direction
+                  )
+           )
+
 -- A child can move if cell is not occupied by Robot | Child | Dirt | Corral
-childCanVisitCell :: (Int, Int) -> Environment -> Bool
-childCanVisitCell (r, c) env =
-  let robotInCell = getRobotInCell env r c
-      childInCell = getChildInCell env r c
-      dirtInCell = getDirtInCell env r c
-      corralInCell = getCorralInCell env r c
-   in isCellInRange r c env
-        && isNothing robotInCell
-        && isNothing childInCell
-        && isNothing dirtInCell
-        && isNothing corralInCell
+canMoveChild :: (Environment, Int) -> Direction -> Bool
+canMoveChild (env, index) direction =
+  let child = children env !! index
+      childPosition = (\(Child x y) -> (x, y)) child
+      newCell = adjacentCell env childPosition direction
+   in isJust newCell
+        && ( let (r, c) = fromJust newCell
+                 robotInCell = getRobotInCell env r c
+                 childInCell = getChildInCell env r c
+                 dirtInCell = getDirtInCell env r c
+                 corralInCell = getCorralInCell env r c
+                 obstacleInCell = getObstacleInCell env r c
+                 obstacleIndex =
+                   if isNothing obstacleInCell
+                     then Nothing
+                     else findIndex (\o -> o == fromJust obstacleInCell) (obstacles env)
+              in isCellInRange r c env
+                   && isNothing robotInCell
+                   && isNothing childInCell
+                   && isNothing dirtInCell
+                   && isNothing corralInCell
+                   && (isNothing obstacleInCell || canMoveObstacle (env, fromJust obstacleIndex) direction)
+           )
 
 adjacentCell :: Environment -> (Int, Int) -> Direction -> Maybe (Int, Int)
 adjacentCell env (r, c) dir

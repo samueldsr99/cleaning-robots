@@ -2,6 +2,7 @@
 module Env where
 
 import Control.Monad (replicateM)
+import Data.List (findIndex)
 import Data.Maybe (fromJust, fromMaybe, isJust, isNothing)
 import System.Random (Random (randomR), StdGen, mkStdGen)
 import Types
@@ -17,11 +18,13 @@ import Types
   )
 import Utils
   ( adjacentCell,
+    canMoveChild,
+    canMoveObstacle,
     childActionToDirection,
-    childCanVisitCell,
     getChildrenPositions,
     getCorralsPositions,
     getDirtPositions,
+    getObstacleInCell,
     getRandomCellsInSquare,
     getRandomCellsInSquareNotContaining,
     getRobotsPositions,
@@ -108,13 +111,34 @@ genInitialState n m childrenAmount robotsAmount obstaclesAmount dirtAmount seed 
           obstacles = obstacles
         }
 
+-- Obstacle functions
+
+-- Move obstacle in a direction given the obstacle index
+moveObstacle :: (Environment, Int) -> Direction -> Environment
+moveObstacle (env, index) direction
+  | not $ canMoveObstacle (env, index) direction = env
+  | otherwise =
+    let obstacle = obstacles env !! index
+        obstaclePosition = (\(Obstacle r c) -> (r, c)) obstacle
+        (newR, newC) = fromJust $ adjacentCell env obstaclePosition direction
+        newObstacle = Obstacle newR newC
+        newEnv = env {obstacles = replace index (obstacles env) newObstacle}
+        obstacleIndexInCell = findIndex (\(Obstacle oR oC) -> (oR, oC) == (newR, newC)) (obstacles env)
+     in if isNothing obstacleIndexInCell
+          then newEnv
+          else moveObstacle (newEnv, fromJust obstacleIndexInCell) direction
+
+-- Child functions
+
 -- Available actions for a child in the environment
 childActions :: Environment -> Child -> [ChildAction]
 childActions env (Child r c) =
   [ x
     | x <- [CUp, CRight, CDown, CLeft],
-      let pos = adjacentCell env (r, c) (fromJust $ childActionToDirection x)
-       in isJust pos && childCanVisitCell (fromJust pos) env
+      let direction = fromJust $ childActionToDirection x
+          pos = adjacentCell env (r, c) direction
+          childIndex = fromJust $ findIndex (\(Child x y) -> (x, y) == (r, c)) (children env)
+       in isJust pos && canMoveChild (env, childIndex) direction
   ]
 
 randomChildAction :: Environment -> Child -> StdGen -> (ChildAction, StdGen)
@@ -123,18 +147,34 @@ randomChildAction env child gen =
       (r, newGen) = randomR (0, length actions - 1) gen :: (Int, StdGen)
    in (actions !! r, newGen)
 
+-- Move a child on a direction given the child index and return the new Environment
+moveChild :: (Environment, Int) -> ChildAction -> Environment
+moveChild (env, index) CStay = env
+moveChild (env, index) action
+  | not $ canMoveChild (env, index) (fromJust $ childActionToDirection action) = env
+  | otherwise =
+    let child = children env !! index
+        direction = fromJust $ childActionToDirection action
+        childPos = (\(Child x y) -> (x, y)) child
+        (newR, newC) = fromJust $ adjacentCell env childPos direction
+        newChild = Child newR newC
+        newEnv = env {children = replace index (children env) newChild}
+        obstacle = getObstacleInCell env newR newC
+        obstacleIndex =
+          if isNothing obstacle
+            then Nothing
+            else findIndex (\o -> o == fromJust obstacle) (obstacles env)
+     in -- Move obstacles
+        if isNothing obstacleIndex
+          then newEnv
+          else moveObstacle (newEnv, fromJust obstacleIndex) direction
+
 moveChildRandomly :: Environment -> Int -> StdGen -> (Environment, StdGen)
 moveChildRandomly env index gen =
   let child = children env !! index
       (action, newGen) = randomChildAction env child gen
-   in if action == CStay
-        then (env, newGen)
-        else
-          let direction = fromJust $ childActionToDirection action
-              childPos = (\(Child x y) -> (x, y)) child
-              (newR, newC) = fromJust $ adjacentCell env childPos direction
-              newChild = Child newR newC
-           in (env {children = replace index (children env) newChild}, newGen)
+      newEnv = moveChild (env, index) action
+   in (newEnv, newGen)
 
 _moveChildrenRandomly :: Environment -> Int -> StdGen -> (Environment, StdGen)
 _moveChildrenRandomly env cur gen =

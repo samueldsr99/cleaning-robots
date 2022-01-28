@@ -14,6 +14,7 @@ import System.Random
 import Types
   ( Child (..),
     Corral (Corral),
+    Direction (DDown, DLeft, DRight, DUp),
     Dirt (Dirt),
     Environment (..),
     Obstacle (Obstacle),
@@ -108,4 +109,3 @@ printEnvironment env = do
   printRows 0 env
 
   print env
-  print $ randomChildAction env (head (children env)) (mkStdGen 21933)

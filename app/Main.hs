@@ -13,16 +13,16 @@ children :: Int
 children = 1
 
 robots :: Int
-robots = 2
+robots = 0
 
 seed :: Int
 seed = 79
 
 obstacles :: Int
-obstacles = 3
+obstacles = 5
 
 dirt :: Int
-dirt = 2
+dirt = 0
 
 -- Start simulation
 main :: IO ()
