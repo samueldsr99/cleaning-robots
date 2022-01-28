@@ -21,6 +21,7 @@ import Utils
     canMoveChild,
     canMoveObstacle,
     childActionToDirection,
+    countChildrenAround,
     getChildrenPositions,
     getCorralsPositions,
     getDirtPositions,
@@ -29,6 +30,9 @@ import Utils
     getRandomCellsInSquareNotContaining,
     getRobotsPositions,
     isCellFree,
+    isCellInRange,
+    randomSelect,
+    randomlyTake,
     replace,
   )
 
@@ -48,26 +52,26 @@ genInitialRobots n m robotsAmount seed =
         ]
    in robots
 
-genChildren :: Int -> Int -> Int -> [(Int, Int)] -> Int -> [Child]
-genChildren n m childrenAmount notContainingCells seed =
+genInitialChildren :: Int -> Int -> Int -> [(Int, Int)] -> Int -> [Child]
+genInitialChildren n m childrenAmount notContainingCells seed =
   [ Child x y
     | (x, y) <- getRandomCellsInSquareNotContaining n m childrenAmount seed notContainingCells
   ]
 
-genDirt :: Int -> Int -> Int -> [(Int, Int)] -> Int -> [Dirt]
-genDirt n m dirtAmount notContainingCells seed =
+genInitialDirt :: Int -> Int -> Int -> [(Int, Int)] -> Int -> [Dirt]
+genInitialDirt n m dirtAmount notContainingCells seed =
   [ Dirt x y
     | (x, y) <- getRandomCellsInSquareNotContaining n m dirtAmount seed notContainingCells
   ]
 
-genCorrals :: Int -> Int -> Int -> [(Int, Int)] -> Int -> [Corral]
-genCorrals n m corralsAmount notContainingCells seed =
+genInitialCorrals :: Int -> Int -> Int -> [(Int, Int)] -> Int -> [Corral]
+genInitialCorrals n m corralsAmount notContainingCells seed =
   [ Corral x y
     | (x, y) <- getRandomCellsInSquareNotContaining n m corralsAmount seed notContainingCells
   ]
 
-genObstacles :: Int -> Int -> Int -> [(Int, Int)] -> Int -> [Obstacle]
-genObstacles n m obstaclesAmount notContainingCells seed =
+genInitialObstacles :: Int -> Int -> Int -> [(Int, Int)] -> Int -> [Obstacle]
+genInitialObstacles n m obstaclesAmount notContainingCells seed =
   [ Obstacle x y
     | (x, y) <- getRandomCellsInSquareNotContaining n m obstaclesAmount seed notContainingCells
   ]
@@ -77,14 +81,14 @@ genInitialState n m childrenAmount robotsAmount obstaclesAmount dirtAmount seed 
   let robots = genInitialRobots n m robotsAmount seed
       robotsPositions = getRobotsPositions robots
 
-      children = genChildren n m childrenAmount robotsPositions seed
+      children = genInitialChildren n m childrenAmount robotsPositions seed
       childrenPositions = getChildrenPositions children
 
-      dirt = genDirt n m dirtAmount (robotsPositions ++ childrenPositions) seed
+      dirt = genInitialDirt n m dirtAmount (robotsPositions ++ childrenPositions) seed
       dirtPositions = getDirtPositions dirt
 
       corrals =
-        genCorrals
+        genInitialCorrals
           n
           m
           childrenAmount
@@ -93,7 +97,7 @@ genInitialState n m childrenAmount robotsAmount obstaclesAmount dirtAmount seed 
       corralsPositions = getCorralsPositions corrals
 
       obstacles =
-        genObstacles
+        genInitialObstacles
           n
           m
           obstaclesAmount
@@ -128,6 +132,37 @@ moveObstacle (env, index) direction
           then newEnv
           else moveObstacle (newEnv, fromJust obstacleIndexInCell) direction
 
+-- Dirt functions
+
+-- Get the amount dirt to generate based on children amount
+amountDirtToGenerate :: Int -> Int
+amountDirtToGenerate childrenAround
+  | childrenAround == 1 = 1
+  | childrenAround == 2 = 3
+  | childrenAround > 2 = 6
+  | otherwise = 0
+
+-- Gen Dirt in environment around center (r, c)
+genDirt :: Environment -> (Int, Int) -> StdGen -> (Environment, StdGen)
+genDirt env (r, c) gen =
+  let childrenAround = countChildrenAround env (r, c)
+      dirtAvailablePositions =
+        [ (x, y)
+          | x <- [r - 1 .. r + 1],
+            y <- [c - 1 .. c + 1],
+            isCellInRange x y env,
+            isCellFree (x, y) env
+        ]
+      maxAmountDirtToGenerate = amountDirtToGenerate childrenAround
+      candidatePositions =
+        randomSelect
+          (min maxAmountDirtToGenerate (length dirtAvailablePositions))
+          dirtAvailablePositions
+          gen
+      (selectedPositions, newGen) = randomlyTake candidatePositions 0.5 gen
+      newDirt = dirt env ++ [Dirt x y | (x, y) <- selectedPositions]
+   in (env {dirt = newDirt}, newGen)
+
 -- Child functions
 
 -- Available actions for a child in the environment
@@ -148,33 +183,35 @@ randomChildAction env child gen =
    in (actions !! r, newGen)
 
 -- Move a child on a direction given the child index and return the new Environment
-moveChild :: (Environment, Int) -> ChildAction -> Environment
-moveChild (env, index) CStay = env
-moveChild (env, index) action
-  | not $ canMoveChild (env, index) (fromJust $ childActionToDirection action) = env
+moveChild :: (Environment, Int) -> ChildAction -> StdGen -> (Environment, StdGen)
+moveChild (env, _) CStay gen = (env, gen)
+moveChild (env, index) action gen
+  | not $ canMoveChild (env, index) (fromJust $ childActionToDirection action) = (env, gen)
   | otherwise =
     let child = children env !! index
-        direction = fromJust $ childActionToDirection action
         childPos = (\(Child x y) -> (x, y)) child
+        direction = fromJust $ childActionToDirection action
         (newR, newC) = fromJust $ adjacentCell env childPos direction
         newChild = Child newR newC
-        newEnv = env {children = replace index (children env) newChild}
+        envAfterMoveChild = env {children = replace index (children env) newChild}
         obstacle = getObstacleInCell env newR newC
         obstacleIndex =
           if isNothing obstacle
             then Nothing
             else findIndex (\o -> o == fromJust obstacle) (obstacles env)
-     in -- Move obstacles
-        if isNothing obstacleIndex
-          then newEnv
-          else moveObstacle (newEnv, fromJust obstacleIndex) direction
+        envAfterMoveObstacles =
+          if isNothing obstacleIndex
+            then envAfterMoveChild
+            else moveObstacle (envAfterMoveChild, fromJust obstacleIndex) direction
+        (envAfterGenDirt, newGen) = genDirt envAfterMoveObstacles childPos gen
+     in (envAfterGenDirt, newGen)
 
 moveChildRandomly :: Environment -> Int -> StdGen -> (Environment, StdGen)
 moveChildRandomly env index gen =
   let child = children env !! index
       (action, newGen) = randomChildAction env child gen
-      newEnv = moveChild (env, index) action
-   in (newEnv, newGen)
+      (newEnv, newGen2) = moveChild (env, index) action newGen
+   in (newEnv, newGen2)
 
 _moveChildrenRandomly :: Environment -> Int -> StdGen -> (Environment, StdGen)
 _moveChildrenRandomly env cur gen =

@@ -21,7 +21,8 @@ import Types
     Robot (..),
   )
 import Utils
-  ( getChildInCell,
+  ( countChildrenAround,
+    getChildInCell,
     getChildrenPositions,
     getCorralInCell,
     getDirtInCell,

@@ -43,7 +43,16 @@ data Environment = Environment
   }
   deriving (Show)
 
-data Direction = DUp | DRight | DLeft | DDown deriving (Show, Eq)
+data Direction
+  = DUp
+  | DRight
+  | DLeft
+  | DDown
+  | DDiagonalUpLeft
+  | DDiagonalUpRight
+  | DDiagonalDownLeft
+  | DDiagonalDownRight
+  deriving (Show, Eq)
 
 data ChildAction = CUp | CRight | CDown | CLeft | CStay deriving (Show, Eq)
 

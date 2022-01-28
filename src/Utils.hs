@@ -3,9 +3,9 @@ module Utils where
 
 import Data.Dynamic (Dynamic)
 import Data.List (find, findIndex)
-import Data.Maybe (fromJust, isJust, isNothing)
+import Data.Maybe (fromJust, fromMaybe, isJust, isNothing)
 import System.Random
-  ( Random (random, randomR),
+  ( Random (random, randomR, randomRs),
     StdGen,
     mkStdGen,
   )
@@ -161,6 +161,10 @@ adjacentCell env (r, c) dir
   | dir == DRight = Just (r, c + 1)
   | dir == DDown = Just (r + 1, c)
   | dir == DLeft = Just (r, c - 1)
+  | dir == DDiagonalUpLeft = Just (r - 1, c - 1)
+  | dir == DDiagonalUpRight = Just (r - 1, c + 1)
+  | dir == DDiagonalDownLeft = Just (r + 1, c - 1)
+  | dir == DDiagonalDownRight = Just (r + 1, c + 1)
   | otherwise = Nothing
 
 childActionToDirection :: ChildAction -> Maybe Direction
@@ -179,3 +183,53 @@ replace elemIndex (x : xs) newElem =
   if elemIndex < 0
     then x : xs
     else x : replace (elemIndex - 1) xs newElem
+
+-- count the amount of children in a 3x3 submatrix given it's center
+countChildrenAround :: Environment -> (Int, Int) -> Int
+countChildrenAround env (r, c) =
+  let childInCenter = getChildInCell env r c
+   in ( if isJust childInCenter
+          then 1
+          else 0
+      )
+        + sum
+          [ 1
+            | direction <-
+                [ DUp,
+                  DRight,
+                  DDown,
+                  DLeft,
+                  DDiagonalUpLeft,
+                  DDiagonalUpRight,
+                  DDiagonalDownLeft,
+                  DDiagonalDownRight
+                ],
+              let newCell = adjacentCell env (r, c) direction
+                  (newR, newC) = fromMaybe (-1, -1) newCell
+               in isJust newCell
+                    && isJust (getChildInCell env newR newC)
+          ]
+
+-- Unique elements of an iterable
+unique :: (Eq a) => [a] -> [a]
+unique [] = []
+unique (x : xs) = x : unique (filter (/= x) xs)
+
+-- Select n elements randomly from an iterable
+randomSelect :: Int -> [a] -> StdGen -> [a]
+randomSelect n list gen =
+  -- Return n elements randomly from list using gen as generator
+  let x = take n $ unique (randomRs (0, length list - 1) gen)
+   in map (list !!) x
+
+-- Simulate take elements from iterable with given select probability
+_randomlyTake :: [a] -> [a] -> Double -> StdGen -> ([a], StdGen)
+_randomlyTake curList [] _ gen = (curList, gen)
+_randomlyTake curList (x : xs) prob gen =
+  let (r, newGen) = randomR (0, 1) gen :: (Double, StdGen)
+   in if r <= prob
+        then _randomlyTake (x : curList) xs prob newGen
+        else _randomlyTake curList xs prob newGen
+
+randomlyTake :: [a] -> Double -> StdGen -> ([a], StdGen)
+randomlyTake = _randomlyTake []
