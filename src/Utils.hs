@@ -135,26 +135,29 @@ canMoveObstacle (env, index) direction =
 canMoveChild :: (Environment, Int) -> Direction -> Bool
 canMoveChild (env, index) direction =
   let child = children env !! index
-      childPosition = (\(Child x y) -> (x, y)) child
-      newCell = adjacentCell env childPosition direction
-   in isJust newCell
-        && ( let (r, c) = fromJust newCell
-                 robotInCell = getRobotInCell env r c
-                 childInCell = getChildInCell env r c
-                 dirtInCell = getDirtInCell env r c
-                 corralInCell = getCorralInCell env r c
-                 obstacleInCell = getObstacleInCell env r c
-                 obstacleIndex =
-                   if isNothing obstacleInCell
-                     then Nothing
-                     else findIndex (\o -> o == fromJust obstacleInCell) (obstacles env)
-              in isCellInRange r c env
-                   && not (childIsLoaded env index)
-                   && isNothing robotInCell
-                   && isNothing childInCell
-                   && isNothing dirtInCell
-                   && isNothing corralInCell
-                   && (isNothing obstacleInCell || canMoveObstacle (env, fromJust obstacleIndex) direction)
+      (r, c) = (\(Child x y) -> (x, y)) child
+      newCell = adjacentCell env (r, c) direction
+      corralInCell = getCorralInCell env r c
+   in isNothing corralInCell
+        && ( isJust newCell
+               && ( let (newR, newC) = fromJust newCell
+                        robotInCell = getRobotInCell env newR newC
+                        childInCell = getChildInCell env newR newC
+                        dirtInCell = getDirtInCell env newR newC
+                        corralInCell = getCorralInCell env newR newC
+                        obstacleInCell = getObstacleInCell env newR newC
+                        obstacleIndex =
+                          if isNothing obstacleInCell
+                            then Nothing
+                            else findIndex (\o -> o == fromJust obstacleInCell) (obstacles env)
+                     in isCellInRange newR newC env
+                          && not (childIsLoaded env index)
+                          && isNothing robotInCell
+                          && isNothing childInCell
+                          && isNothing dirtInCell
+                          && isNothing corralInCell
+                          && (isNothing obstacleInCell || canMoveObstacle (env, fromJust obstacleIndex) direction)
+                  )
            )
 
 -- Check whether a robot can move

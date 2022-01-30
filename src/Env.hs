@@ -243,7 +243,12 @@ _robotMoveActions env index =
       ]
 
 _robotChildActions :: Environment -> Int -> [RobotAction]
-_robotChildActions env index = []
+_robotChildActions env index =
+  let robot = robots env !! index
+      (r, c) = position robot
+      dirtInCell = getDirtInCell env r c
+      obstacleInCell = getObstacleInCell env r c
+   in [RDropChild | not (isJust dirtInCell || isJust obstacleInCell) && isJust (loadingChild robot)]
 
 _robotCleaningActions :: Environment -> Int -> [RobotAction]
 _robotCleaningActions env index =
@@ -312,7 +317,7 @@ applyRobotAction (env, index) action
      in if action == RDropChild
           then
             let newRobot = robot {loadingChild = Nothing}
-             in env {robots = replace index (robots env) robot}
+             in env {robots = replace index (robots env) newRobot}
           else
             let dirtInCell = getDirtInCell env r c
                 newDirtList =
