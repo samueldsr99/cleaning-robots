@@ -10,16 +10,16 @@ m :: Int
 m = 6
 
 children :: Int
-children = 1
+children = 2
 
 robots :: Int
-robots = 0
+robots = 1
 
 seed :: Int
 seed = 98
 
 obstacles :: Int
-obstacles = 2
+obstacles = 0
 
 dirt :: Int
 dirt = 0

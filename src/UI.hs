@@ -9,7 +9,7 @@ import Control.Monad (when)
 import Data.List (find)
 import Data.Maybe (fromJust, fromMaybe, isNothing)
 import qualified Data.Maybe
-import Env (childActions, randomChildAction)
+import Env (childActions, randomChildAction, robotActions)
 import System.Random ()
 import Types
   ( Child (..),
@@ -110,3 +110,4 @@ printEnvironment env = do
   printRows 0 env
 
   print env
+  print $ robotActions env 0

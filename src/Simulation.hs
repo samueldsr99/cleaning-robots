@@ -1,9 +1,9 @@
 -- Main module for doing simulations
 module Simulation (simulate) where
 
-import Env (genInitialState, moveChildRandomly, moveChildrenRandomly)
+import Env (applyRobotAction, genInitialState, moveChildRandomly, moveChildrenRandomly)
 import System.Random (StdGen, mkStdGen)
-import Types (Environment)
+import Types (Environment, RobotAction (RClean, RUp))
 import UI (clearScreen, printEnvironment)
 import Utils (getRandomCellsInSquareNotContaining)
 
@@ -13,7 +13,8 @@ doCycle env count gen = do
   printEnvironment env
   _ <- getLine
   let (newEnv, newGen) = moveChildrenRandomly env gen
-   in doCycle newEnv (count + 1) newGen
+      newEnv2 = applyRobotAction (newEnv, 0) (if count < 5 then RUp else RClean)
+   in doCycle newEnv2 (count + 1) newGen
 
 simulate :: Int -> Int -> Int -> Int -> Int -> Int -> Int -> IO ()
 simulate n m children robots obstacles dirt seed =

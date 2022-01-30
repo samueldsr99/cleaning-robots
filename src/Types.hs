@@ -8,6 +8,7 @@ module Types
     Corral (Corral),
     Obstacle (Obstacle),
     ChildAction (..),
+    RobotAction (..),
     Direction (..),
   )
 where
@@ -56,4 +57,12 @@ data Direction
 
 data ChildAction = CUp | CRight | CDown | CLeft | CStay deriving (Show, Eq)
 
-data RobotAction = RUp | RRight | RDown | RLeft | RStay deriving (Show, Eq)
+data RobotAction
+  = RUp
+  | RRight
+  | RDown
+  | RLeft
+  | RStay
+  | RDropChild
+  | RClean
+  deriving (Show, Eq)

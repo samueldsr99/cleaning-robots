@@ -18,6 +18,7 @@ import Types
     Environment (..),
     Obstacle (..),
     Robot (..),
+    RobotAction (..),
   )
 
 _getRandomCellsInSquare :: Int -> Int -> [(Int, Int)] -> Int -> StdGen -> ([(Int, Int)], StdGen)
@@ -130,7 +131,7 @@ canMoveObstacle (env, index) direction =
                   )
            )
 
--- A child can move if cell is not occupied by Robot | Child | Dirt | Corral
+-- Check whether a child can move
 canMoveChild :: (Environment, Int) -> Direction -> Bool
 canMoveChild (env, index) direction =
   let child = children env !! index
@@ -156,6 +157,21 @@ canMoveChild (env, index) direction =
                    && (isNothing obstacleInCell || canMoveObstacle (env, fromJust obstacleIndex) direction)
            )
 
+-- Check whether a robot can move
+canMoveRobot :: (Environment, Int) -> Direction -> Bool
+canMoveRobot (env, index) direction =
+  let robot = robots env !! index
+      robotPosition = position robot
+      newCell = adjacentCell env robotPosition direction
+   in isJust newCell
+        && ( let (r, c) = fromJust newCell
+                 robotInCell = getRobotInCell env r c
+                 obstacleInCell = getObstacleInCell env r c
+              in isCellInRange r c env
+                   && isNothing robotInCell
+                   && isNothing obstacleInCell
+           )
+
 adjacentCell :: Environment -> (Int, Int) -> Direction -> Maybe (Int, Int)
 adjacentCell env (r, c) dir
   | dir == DUp = Just (r - 1, c)
@@ -174,6 +190,14 @@ childActionToDirection action
   | action == CRight = Just DRight
   | action == CDown = Just DDown
   | action == CLeft = Just DLeft
+  | otherwise = Nothing
+
+robotActionToDirection :: RobotAction -> Maybe Direction
+robotActionToDirection action
+  | action == RUp = Just DUp
+  | action == RRight = Just DRight
+  | action == RDown = Just DDown
+  | action == RLeft = Just DLeft
   | otherwise = Nothing
 
 -- replace an element in a iterable with another

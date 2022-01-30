@@ -2,7 +2,7 @@
 module Env where
 
 import Control.Monad (replicateM)
-import Data.List (findIndex)
+import Data.List (delete, elemIndex, findIndex)
 import Data.Maybe (fromJust, fromMaybe, isJust, isNothing)
 import System.Random (Random (randomR), StdGen, mkStdGen)
 import Types
@@ -15,15 +15,19 @@ import Types
     Obstacle (Obstacle),
     RType,
     Robot (..),
+    RobotAction (..),
   )
 import Utils
   ( adjacentCell,
     canMoveChild,
     canMoveObstacle,
+    canMoveRobot,
     childActionToDirection,
     countChildrenAround,
+    getChildInCell,
     getChildrenPositions,
     getCorralsPositions,
+    getDirtInCell,
     getDirtPositions,
     getObstacleInCell,
     getRandomCellsInSquare,
@@ -34,6 +38,7 @@ import Utils
     randomSelect,
     randomlyTake,
     replace,
+    robotActionToDirection,
   )
 
 -- Initial State generations
@@ -223,3 +228,95 @@ _moveChildrenRandomly env cur gen =
 
 moveChildrenRandomly :: Environment -> StdGen -> (Environment, StdGen)
 moveChildrenRandomly env = _moveChildrenRandomly env 0
+
+-- Robot functions
+
+_robotMoveActions :: Environment -> Int -> [RobotAction]
+_robotMoveActions env index =
+  let robot = robots env !! index
+      pos = position robot
+   in [ x
+        | x <- [RUp, RDown, RLeft, RRight],
+          let direction = fromJust $ robotActionToDirection x
+              newPos = adjacentCell env (position robot) direction
+           in isJust newPos && canMoveRobot (env, index) direction
+      ]
+
+_robotChildActions :: Environment -> Int -> [RobotAction]
+_robotChildActions env index = []
+
+_robotCleaningActions :: Environment -> Int -> [RobotAction]
+_robotCleaningActions env index =
+  let robot = robots env !! index
+      (r, c) = position robot
+      dirtInCell = getDirtInCell env r c
+   in [RClean | isJust dirtInCell]
+
+-- Available actions for a robot in the environment
+robotActions :: Environment -> Int -> [RobotAction]
+robotActions env index =
+  _robotMoveActions env index
+    ++ _robotChildActions env index
+    ++ _robotCleaningActions env index
+
+-- Move robot in a direction
+moveRobot :: (Environment, Int) -> Direction -> Environment
+moveRobot (env, index) direction
+  | not $ canMoveRobot (env, index) direction = env
+  | otherwise =
+    let robot = robots env !! index
+        robotPosition = position robot
+        -- Update robot coordinates
+        (newRobotR, newRobotC) = fromJust $ adjacentCell env robotPosition direction
+        -- If robot is carrying a child move child also
+        childIndex = loadingChild robot
+        updatedChildLoaded =
+          if isJust childIndex
+            then
+              ( let child = children env !! fromJust childIndex
+                    childPos = (\(Child x y) -> (x, y)) child
+                    (newChildR, newChildC) = fromJust $ adjacentCell env childPos direction
+                    newChild = Child newChildR newChildC
+                 in Just newChild
+              )
+            else Nothing
+        newEnvChildren =
+          if isJust childIndex
+            then replace (fromJust childIndex) (children env) (fromJust updatedChildLoaded)
+            else children env
+        -- If robot is in a child cell then carry him
+        childInCell = getChildInCell env newRobotR newRobotC
+        newChildLoaded =
+          if isJust childInCell
+            then elemIndex (fromJust childInCell) (children env)
+            else loadingChild robot
+        newRobot =
+          robot
+            { position = (newRobotR, newRobotC),
+              loadingChild = newChildLoaded
+            }
+     in env
+          { robots = replace index (robots env) newRobot,
+            children = newEnvChildren
+          }
+
+-- Apply a robot action and return the new modified environment
+applyRobotAction :: (Environment, Int) -> RobotAction -> Environment
+applyRobotAction (env, index) action
+  | action `notElem` robotActions env index || action == RStay = env
+  | action `elem` [RUp, RDown, RLeft, RRight] =
+    moveRobot (env, index) (fromJust $ robotActionToDirection action)
+  | otherwise =
+    let robot = robots env !! index
+        (r, c) = position robot
+     in if action == RDropChild
+          then
+            let newRobot = robot {loadingChild = Nothing}
+             in env {robots = replace index (robots env) robot}
+          else
+            let dirtInCell = getDirtInCell env r c
+                newDirtList =
+                  if isJust dirtInCell
+                    then delete (fromJust dirtInCell) (dirt env)
+                    else dirt env
+             in env {dirt = newDirtList}
