@@ -1,7 +1,7 @@
 -- Main module for doing simulations
 module Simulation (simulate) where
 
-import Agents.RandomAgent (getAction)
+import Agents.ReactiveAgent (getAction)
 import Debug.Trace (trace)
 import Env (applyRobotAction, genInitialState, moveChildRandomly, moveChildrenRandomly)
 import System.Random (StdGen, mkStdGen)

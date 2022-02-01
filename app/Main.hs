@@ -4,10 +4,10 @@ import Simulation (simulate)
 
 -- Simulation params
 n :: Int
-n = 6
+n = 5
 
 m :: Int
-m = 6
+m = 5
 
 children :: Int
 children = 2
@@ -16,7 +16,7 @@ robots :: Int
 robots = 1
 
 seed :: Int
-seed = 98
+seed = 9233
 
 obstacles :: Int
 obstacles = 0

@@ -110,4 +110,3 @@ printEnvironment env = do
   printRows 0 env
 
   print env
-  print $ robotActions env 0

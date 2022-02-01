@@ -26,6 +26,8 @@ source-repository head
 library
   exposed-modules:
       Agents.RandomAgent
+      Agents.ReactiveAgent
+      Agents.Utils
       Env
       Simulation
       Types

@@ -175,6 +175,18 @@ canMoveRobot (env, index) direction =
                    && isNothing obstacleInCell
            )
 
+canMoveRobotInPosition :: Environment -> (Int, Int) -> Direction -> Bool
+canMoveRobotInPosition env (r, c) direction =
+  let newCell = adjacentCell env (r, c) direction
+   in isJust newCell
+        && ( let (r, c) = fromJust newCell
+                 robotInCell = getRobotInCell env r c
+                 obstacleInCell = getObstacleInCell env r c
+              in isCellInRange r c env
+                   && isNothing robotInCell
+                   && isNothing obstacleInCell
+           )
+
 adjacentCell :: Environment -> (Int, Int) -> Direction -> Maybe (Int, Int)
 adjacentCell env (r, c) dir
   | dir == DUp = Just (r - 1, c)
@@ -201,6 +213,14 @@ robotActionToDirection action
   | action == RRight = Just DRight
   | action == RDown = Just DDown
   | action == RLeft = Just DLeft
+  | otherwise = Nothing
+
+robotDirectionToAction :: Direction -> Maybe RobotAction
+robotDirectionToAction direction
+  | direction == DUp = Just RUp
+  | direction == DRight = Just RRight
+  | direction == DDown = Just RDown
+  | direction == DLeft = Just RLeft
   | otherwise = Nothing
 
 -- replace an element in a iterable with another
