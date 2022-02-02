@@ -1,7 +1,8 @@
 module Agents.Utils where
 
-import Data.List (elemIndex, findIndex, nub, sortOn)
-import Data.Maybe (fromJust, isJust, isNothing)
+import qualified Data.Bifunctor
+import Data.List (elemIndex, find, findIndex, nub, sortOn)
+import Data.Maybe (catMaybes, fromJust, isJust, isNothing)
 import Debug.Trace (trace)
 import Types
   ( Child (..),
@@ -65,7 +66,7 @@ bfs env visited ((BfsState curPosition curDistance) : queue) = bfs env visited' 
     visited' = visited ++ neighbours
     queue' = queue ++ neighbours
 
-nextDirectionToNearbyEmptyCorral :: Environment -> (Int, Int) -> Direction
+nextDirectionToNearbyEmptyCorral :: Environment -> (Int, Int) -> Maybe Direction
 nextDirectionToNearbyEmptyCorral env (r, c) =
   let availableDirections =
         [ direction
@@ -79,15 +80,19 @@ nextDirectionToNearbyEmptyCorral env (r, c) =
         [ bfs env [BfsState (r, c) 0] [BfsState (r, c) 0]
           | ((r, c), _) <- neighbours
         ]
-      filter_corral_positions = filter (\(BfsState (r, c) _) -> isFreeCorral env (r, c))
-      freeCorralPositionsFromNeighbours = map filter_corral_positions reachable_positions_from_neighbours
+      filterCorralPositions = filter (\(BfsState (r, c) _) -> isFreeCorral env (r, c))
+      freeCorralPositionsFromNeighbours = map filterCorralPositions reachable_positions_from_neighbours
       minFreeCorralPositionFromNeighbours =
-        [ head $ sortOn (\(BfsState _ distance) -> distance) x
-          | x <- freeCorralPositionsFromNeighbours
-        ]
-      minDistanceCorral = head $ sortOn (\(BfsState _ distance) -> distance) minFreeCorralPositionFromNeighbours
-      minDirectionIndex = fromJust $ elemIndex minDistanceCorral minFreeCorralPositionFromNeighbours
-   in availableDirections !! minDirectionIndex
+        catMaybes
+          [ if null x then Nothing else Just $ head (sortOn (\(BfsState _ distance) -> distance) x)
+            | x <- freeCorralPositionsFromNeighbours
+          ]
+   in if null minFreeCorralPositionFromNeighbours
+        then Nothing
+        else
+          let minDistanceCorral = head $ sortOn (\(BfsState _ distance) -> distance) minFreeCorralPositionFromNeighbours
+              minDirectionIndex = fromJust $ findIndex (isJust . find (== minDistanceCorral)) freeCorralPositionsFromNeighbours
+           in Just $ availableDirections !! minDirectionIndex
 
 -- Get the bfs states of all children reachable from (r, c) walking as a robot
 reachableChildrenStates :: Environment -> (Int, Int) -> [BfsState]
@@ -125,7 +130,7 @@ bestChildToLoad env childrenPositions =
    in Just $ head $ sortOn childValue childrenPositions
 
 -- Get the next direction to reach the best child to load starting at (r, c)
-nextDirectionToBestChildToLoad :: Environment -> (Int, Int) -> Direction
+nextDirectionToBestChildToLoad :: Environment -> (Int, Int) -> Maybe Direction
 nextDirectionToBestChildToLoad env (r, c) =
   let availableDirections =
         [ direction
@@ -138,10 +143,14 @@ nextDirectionToBestChildToLoad env (r, c) =
       reachableChildrenFromNeighbours =
         [reachableChildrenStates env pos | (pos, _) <- neighbours]
       bestChildToLoadFromNeighbours =
-        [fromJust $ bestChildToLoad env state | state <- reachableChildrenFromNeighbours]
-      bestChild = head $ sortOn (\(BfsState pos distance) -> distance) bestChildToLoadFromNeighbours
-      bestChildIndex = fromJust $ elemIndex bestChild bestChildToLoadFromNeighbours
-   in availableDirections !! bestChildIndex
+        [bestChildToLoad env states | states <- reachableChildrenFromNeighbours]
+      justBestChildToLoadFromNeighbours = catMaybes bestChildToLoadFromNeighbours
+   in if null justBestChildToLoadFromNeighbours
+        then Nothing
+        else
+          let bestChild = head $ sortOn (\(BfsState pos distance) -> distance) justBestChildToLoadFromNeighbours
+              bestChildIndex = fromJust $ elemIndex (Just bestChild) bestChildToLoadFromNeighbours
+           in Just $ availableDirections !! bestChildIndex
 
 -- Get the nearest dirty cell starting at (r, c)
 nearestDirtyCell :: Environment -> (Int, Int) -> Maybe BfsState
@@ -153,7 +162,7 @@ nearestDirtyCell env curPos =
         else Nothing
 
 -- Get the next direction in the path to reach the nearest dirty cell starting at (r, c)
-nextDirectionToNearestDirtyCell :: Environment -> (Int, Int) -> Direction
+nextDirectionToNearestDirtyCell :: Environment -> (Int, Int) -> Maybe Direction
 nextDirectionToNearestDirtyCell env (r, c) =
   let availableDirections =
         [ direction
@@ -162,9 +171,16 @@ nextDirectionToNearestDirtyCell env (r, c) =
              in isJust adj && canMoveRobotInPosition env (r, c) direction
         ]
       neighbours =
-        [(fromJust $ adjacentCell env (r, c) direction, direction) | direction <- availableDirections]
+        [(adjacentCell env (r, c) direction, direction) | direction <- availableDirections]
       nearestDirtyCellFromNeighbours =
-        [fromJust $ nearestDirtyCell env pos | (pos, _) <- neighbours]
-      nearestCell = head $ sortOn (\(BfsState pos distance) -> distance) nearestDirtyCellFromNeighbours
-      nearestCellIndex = fromJust $ elemIndex nearestCell nearestDirtyCellFromNeighbours
-   in availableDirections !! nearestCellIndex
+        map
+          (Data.Bifunctor.first fromJust)
+          ( filter
+              (\(st, d) -> isJust st)
+              [(nearestDirtyCell env (fromJust pos), direction) | (pos, direction) <- neighbours, isJust pos]
+          )
+
+      sortedCells = sortOn (\(BfsState _ distance, _) -> distance) nearestDirtyCellFromNeighbours
+   in if null sortedCells
+        then Nothing
+        else Just $ snd $ head sortedCells

@@ -9,6 +9,7 @@ import Agents.Utils
     distanceToNearbyCorral,
     isCorral,
     isDirty,
+    isFreeCorral,
     isLoadingChild,
     nextDirectionToBestChildToLoad,
     nextDirectionToNearbyEmptyCorral,
@@ -17,12 +18,13 @@ import Agents.Utils
   )
 import Data.Foldable (find)
 import Data.List (nub, sortOn)
-import Data.Maybe (fromJust, isJust, isNothing)
+import Data.Maybe (catMaybes, fromJust, isJust, isNothing)
 import Env (genInitialState)
-import System.Random (StdGen)
+import System.Random (StdGen, mkStdGen)
 import Types
   ( Child (Child),
     Corral (Corral),
+    Direction (..),
     Dirt (Dirt),
     Environment (..),
     Obstacle (Obstacle),
@@ -30,22 +32,34 @@ import Types
     RobotAction (..),
   )
 import UI (printEnvironment)
-import Utils (getCorralInCell, getDirtInCell, getRobotInCell, robotDirectionToAction)
+import Utils (adjacentCell, canMoveRobotInPosition, childrenAmountInPosition, getCorralInCell, getDirtInCell, getRobotInCell, robotDirectionToAction)
 
 -- Action method
 getAction :: (Environment, Int) -> StdGen -> (RobotAction, StdGen)
 getAction (env, index) gen
-  | isLoadingChild robot && isCorral env robotPosition = (RDropChild, gen)
+  | isLoadingChild robot && isCorral env robotPosition && (childrenAmountInPosition env robotPosition == 1) = (RDropChild, gen)
   | isLoadingChild robot && isDirty env robotPosition = (RClean, gen)
   | isLoadingChild robot =
-    let action = fromJust $ robotDirectionToAction (nextDirectionToNearbyEmptyCorral env (position robot))
+    let direction = nextDirectionToNearbyEmptyCorral env (position robot)
+        action =
+          if isJust direction
+            then fromJust $ robotDirectionToAction (fromJust direction)
+            else RStay
      in (action, gen)
   | not (isLoadingChild robot) && not (anyKidOutSideCorral env) && isDirty env robotPosition = (RClean, gen)
   | not (isLoadingChild robot) && not (anyKidOutSideCorral env) && anyDirtyCell env =
-    let action = fromJust $ robotDirectionToAction (nextDirectionToNearestDirtyCell env (position robot))
+    let direction = nextDirectionToNearestDirtyCell env (position robot)
+        action =
+          if isJust direction
+            then fromJust $ robotDirectionToAction (fromJust direction)
+            else RStay
      in (action, gen)
   | not (isLoadingChild robot) && anyKidOutSideCorral env =
-    let action = fromJust $ robotDirectionToAction (nextDirectionToBestChildToLoad env (position robot))
+    let direction = nextDirectionToBestChildToLoad env (position robot)
+        action =
+          if isJust direction
+            then fromJust $ robotDirectionToAction (fromJust direction)
+            else RStay
      in (action, gen)
   | otherwise = (RStay, gen)
   where
@@ -54,10 +68,10 @@ getAction (env, index) gen
 
 test :: IO ()
 test =
-  let env = genInitialState 5 5 2 1 3 1 98
-      robot = Robot {idx = 1, rtype = "A", position = (1, 4), loadingChild = Nothing}
-      env2 = Environment {n = 5, m = 5, robotsAmount = 0, childrenAmount = 2, robots = [], children = [Child 1 2, Child 2 3], dirt = [Dirt 0 0], corrals = [Corral 1 2, Corral 2 3], obstacles = []}
+  let robot1 = Robot {idx = 1, rtype = "A", position = (1, 3), loadingChild = Just 0}
+      robot2 = Robot {idx = 2, rtype = "A", position = (0, 4), loadingChild = Nothing}
+      env = Environment {n = 10, m = 10, robotsAmount = 2, childrenAmount = 5, robots = [Robot {idx = 1, rtype = "A", position = (0, 7), loadingChild = Nothing}, Robot {idx = 2, rtype = "A", position = (5, 3), loadingChild = Just 2}], children = [Child 6 7, Child 0 8, Child 5 3, Child 1 6, Child 9 1], dirt = [Dirt 1 5, Dirt 5 8, Dirt 1 4, Dirt 2 6, Dirt 3 6, Dirt 3 4, Dirt 8 1, Dirt 4 7, Dirt 2 3, Dirt 9 0, Dirt 2 2, Dirt 2 1, Dirt 1 9, Dirt 3 1, Dirt 9 3, Dirt 4 1, Dirt 6 2, Dirt 5 3, Dirt 6 0, Dirt 6 1, Dirt 6 3, Dirt 8 0, Dirt 7 1, Dirt 7 2, Dirt 8 2], corrals = [Corral 7 3, Corral 0 8, Corral 6 7, Corral 1 6, Corral 9 6], obstacles = [Obstacle 6 5, Obstacle 7 7, Obstacle 0 9, Obstacle 7 0, Obstacle 1 8]}
    in do
-        printEnvironment env2
-        print $ any (\(Child r c) -> isNothing $ getCorralInCell env2 r c) (children env2)
-        print $ anyKidOutSideCorral env2
+        printEnvironment env
+        print $ getAction (env, 0) (mkStdGen 40)
+        print $ nextDirectionToBestChildToLoad env (0, 7)

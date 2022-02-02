@@ -291,3 +291,8 @@ exists e (x : xs) = (e == x) || exists e xs
 childIsLoaded :: Environment -> Int -> Bool
 childIsLoaded Environment {robots = robots} index =
   exists (Just index) (map loadingChild robots)
+
+-- Count the amount of children in (r, c)
+childrenAmountInPosition :: Environment -> (Int, Int) -> Int
+childrenAmountInPosition env (r, c) =
+  length $ filter (\(Child x y) -> (x, y) == (r, c)) (children env)

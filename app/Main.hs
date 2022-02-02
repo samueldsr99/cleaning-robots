@@ -4,25 +4,25 @@ import Simulation (simulate)
 
 -- Simulation params
 n :: Int
-n = 5
+n = 10
 
 m :: Int
-m = 5
+m = 10
 
 children :: Int
-children = 2
+children = 6
 
 robots :: Int
-robots = 1
+robots = 3
 
 seed :: Int
-seed = 9233
+seed = 3
 
 obstacles :: Int
-obstacles = 0
+obstacles = 8
 
 dirt :: Int
-dirt = 0
+dirt = 9
 
 -- Start simulation
 main :: IO ()

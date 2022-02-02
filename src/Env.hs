@@ -292,7 +292,7 @@ moveRobot (env, index) direction
         -- If robot is in a child cell then carry him
         childInCell = getChildInCell env newRobotR newRobotC
         newChildLoaded =
-          if isJust childInCell
+          if isJust childInCell && isNothing (loadingChild robot)
             then elemIndex (fromJust childInCell) (children env)
             else loadingChild robot
         newRobot =
