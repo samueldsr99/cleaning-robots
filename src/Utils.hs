@@ -31,11 +31,11 @@ _getRandomCellsInSquare n m currentList k gen =
         then (rest, new_gen1)
         else (currentList, gen)
 
-getRandomCellsInSquare :: Int -> Int -> Int -> Int -> [(Int, Int)]
-getRandomCellsInSquare n m amount seed =
-  let (_, gen) = random (mkStdGen seed) :: (Int, StdGen)
+getRandomCellsInSquare :: Int -> Int -> Int -> StdGen -> ([(Int, Int)], StdGen)
+getRandomCellsInSquare n m amount gen =
+  let (_, newGen) = random gen :: (Int, StdGen)
       (positions, _) = _getRandomCellsInSquare n m [] amount gen
-   in positions
+   in (positions, newGen)
 
 _getRandomCellsInSquareNotContaining :: Int -> Int -> [(Int, Int)] -> [(Int, Int)] -> Int -> StdGen -> ([(Int, Int)], StdGen)
 _getRandomCellsInSquareNotContaining n m currentList notContainList k gen =
@@ -54,11 +54,11 @@ _getRandomCellsInSquareNotContaining n m currentList notContainList k gen =
         then (rest, new_gen1)
         else (currentList, gen)
 
-getRandomCellsInSquareNotContaining :: Int -> Int -> Int -> Int -> [(Int, Int)] -> [(Int, Int)]
-getRandomCellsInSquareNotContaining n m amount seed notContainList =
-  let (_, gen) = random (mkStdGen seed) :: (Int, StdGen)
+getRandomCellsInSquareNotContaining :: Int -> Int -> Int -> StdGen -> [(Int, Int)] -> ([(Int, Int)], StdGen)
+getRandomCellsInSquareNotContaining n m amount gen notContainList =
+  let (_, newGen) = random gen :: (Int, StdGen)
       (positions, _) = _getRandomCellsInSquareNotContaining n m [] notContainList amount gen
-   in positions
+   in (positions, newGen)
 
 getRobotsPositions :: [Robot] -> [(Int, Int)]
 getRobotsPositions = map position
@@ -296,3 +296,20 @@ childIsLoaded Environment {robots = robots} index =
 childrenAmountInPosition :: Environment -> (Int, Int) -> Int
 childrenAmountInPosition env (r, c) =
   length $ filter (\(Child x y) -> (x, y) == (r, c)) (children env)
+
+-- Count the amount of dirty in the Environment
+dirtAmount :: Environment -> Int
+dirtAmount env = length (dirt env)
+
+-- Count the amount of empty cells in the Environment
+emptyCells :: Environment -> Int
+emptyCells env =
+  length [1 | r <- [0 .. n env - 1], c <- [0 .. m env - 1], isCellFree (r, c) env]
+
+-- Get the percent of free cells in the Environment
+freeCellsPercent :: Environment -> Double
+freeCellsPercent env =
+  empty / (empty + dirty)
+  where
+    empty = fromIntegral $ emptyCells env :: Double
+    dirty = fromIntegral $ dirtAmount env :: Double

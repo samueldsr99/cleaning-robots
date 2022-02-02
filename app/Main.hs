@@ -10,19 +10,22 @@ m :: Int
 m = 10
 
 children :: Int
-children = 6
+children = 5
 
 robots :: Int
-robots = 3
+robots = 4
 
 seed :: Int
 seed = 3
 
 obstacles :: Int
-obstacles = 8
+obstacles = 5
 
 dirt :: Int
-dirt = 9
+dirt = 2
+
+timeToShuffleEnv :: Int
+timeToShuffleEnv = 50
 
 -- Start simulation
 main :: IO ()
@@ -34,6 +37,7 @@ main = do
   putStrLn $ "Children amount: " ++ show children
   putStrLn $ "Obstacles amount: " ++ show obstacles
   putStrLn $ "Dirt amount: " ++ show dirt
+  putStrLn $ "Time to Randomly Shuffle Environment: " ++ show timeToShuffleEnv
   putStrLn "__________________________________________\n"
 
-  simulate n m children robots obstacles dirt seed
+  simulate n m children robots obstacles dirt timeToShuffleEnv seed

@@ -43,9 +43,9 @@ import Utils
 
 -- Initial State generations
 
-genInitialRobots :: Int -> Int -> Int -> Int -> [Robot]
-genInitialRobots n m robotsAmount seed =
-  let robotPositions = getRandomCellsInSquare n m robotsAmount seed
+genInitialRobots :: Int -> Int -> Int -> StdGen -> ([Robot], StdGen)
+genInitialRobots n m robotsAmount gen =
+  let (robotPositions, newGen) = getRandomCellsInSquare n m robotsAmount gen
       robots =
         [ Robot
             { idx = idx,
@@ -55,70 +55,84 @@ genInitialRobots n m robotsAmount seed =
             }
           | (pos, idx) <- zip robotPositions [1 .. robotsAmount]
         ]
-   in robots
+   in (robots, newGen)
 
-genInitialChildren :: Int -> Int -> Int -> [(Int, Int)] -> Int -> [Child]
-genInitialChildren n m childrenAmount notContainingCells seed =
-  [ Child x y
-    | (x, y) <- getRandomCellsInSquareNotContaining n m childrenAmount seed notContainingCells
-  ]
+genInitialChildren :: Int -> Int -> Int -> [(Int, Int)] -> StdGen -> ([Child], StdGen)
+genInitialChildren n m childrenAmount notContainingCells gen =
+  let (randomCells, newGen) = getRandomCellsInSquareNotContaining n m childrenAmount gen notContainingCells
+   in ( [ Child x y
+          | (x, y) <- randomCells
+        ],
+        gen
+      )
 
-genInitialDirt :: Int -> Int -> Int -> [(Int, Int)] -> Int -> [Dirt]
-genInitialDirt n m dirtAmount notContainingCells seed =
-  [ Dirt x y
-    | (x, y) <- getRandomCellsInSquareNotContaining n m dirtAmount seed notContainingCells
-  ]
+genInitialDirt :: Int -> Int -> Int -> [(Int, Int)] -> StdGen -> ([Dirt], StdGen)
+genInitialDirt n m dirtAmount notContainingCells gen =
+  let (randomCells, newGen) = getRandomCellsInSquareNotContaining n m dirtAmount gen notContainingCells
+   in ( [ Dirt x y
+          | (x, y) <- randomCells
+        ],
+        newGen
+      )
 
-genInitialCorrals :: Int -> Int -> Int -> [(Int, Int)] -> Int -> [Corral]
-genInitialCorrals n m corralsAmount notContainingCells seed =
-  [ Corral x y
-    | (x, y) <- getRandomCellsInSquareNotContaining n m corralsAmount seed notContainingCells
-  ]
+genInitialCorrals :: Int -> Int -> Int -> [(Int, Int)] -> StdGen -> ([Corral], StdGen)
+genInitialCorrals n m corralsAmount notContainingCells gen =
+  let (randomCells, newGen) = getRandomCellsInSquareNotContaining n m corralsAmount gen notContainingCells
+   in ( [ Corral x y
+          | (x, y) <- randomCells
+        ],
+        newGen
+      )
 
-genInitialObstacles :: Int -> Int -> Int -> [(Int, Int)] -> Int -> [Obstacle]
-genInitialObstacles n m obstaclesAmount notContainingCells seed =
-  [ Obstacle x y
-    | (x, y) <- getRandomCellsInSquareNotContaining n m obstaclesAmount seed notContainingCells
-  ]
+genInitialObstacles :: Int -> Int -> Int -> [(Int, Int)] -> StdGen -> ([Obstacle], StdGen)
+genInitialObstacles n m obstaclesAmount notContainingCells gen =
+  let (randomCells, newGen) = getRandomCellsInSquareNotContaining n m obstaclesAmount gen notContainingCells
+   in ( [ Obstacle x y
+          | (x, y) <- randomCells
+        ],
+        newGen
+      )
 
-genInitialState :: Int -> Int -> Int -> Int -> Int -> Int -> Int -> Environment
-genInitialState n m childrenAmount robotsAmount obstaclesAmount dirtAmount seed =
-  let robots = genInitialRobots n m robotsAmount seed
+genInitialState :: Int -> Int -> Int -> Int -> Int -> Int -> StdGen -> (Environment, StdGen)
+genInitialState n m childrenAmount robotsAmount obstaclesAmount dirtAmount gen =
+  let (robots, newGen) = genInitialRobots n m robotsAmount gen
       robotsPositions = getRobotsPositions robots
 
-      children = genInitialChildren n m childrenAmount robotsPositions seed
+      (children, newGen2) = genInitialChildren n m childrenAmount robotsPositions newGen
       childrenPositions = getChildrenPositions children
 
-      dirt = genInitialDirt n m dirtAmount (robotsPositions ++ childrenPositions) seed
+      (dirt, newGen3) = genInitialDirt n m dirtAmount (robotsPositions ++ childrenPositions) newGen2
       dirtPositions = getDirtPositions dirt
 
-      corrals =
+      (corrals, newGen4) =
         genInitialCorrals
           n
           m
           childrenAmount
           (robotsPositions ++ childrenPositions ++ dirtPositions)
-          seed
+          newGen3
       corralsPositions = getCorralsPositions corrals
 
-      obstacles =
+      (obstacles, newGen5) =
         genInitialObstacles
           n
           m
           obstaclesAmount
           (robotsPositions ++ childrenPositions ++ dirtPositions ++ corralsPositions)
-          seed
-   in Environment
-        { n = n,
-          m = m,
-          robotsAmount = robotsAmount,
-          childrenAmount = childrenAmount,
-          robots = robots,
-          children = children,
-          dirt = dirt,
-          corrals = corrals,
-          obstacles = obstacles
-        }
+          newGen4
+   in ( Environment
+          { n = n,
+            m = m,
+            robotsAmount = robotsAmount,
+            childrenAmount = childrenAmount,
+            robots = robots,
+            children = children,
+            dirt = dirt,
+            corrals = corrals,
+            obstacles = obstacles
+          },
+        newGen5
+      )
 
 -- Obstacle functions
 
@@ -325,3 +339,15 @@ applyRobotAction (env, index) action
                     then delete (fromJust dirtInCell) (dirt env)
                     else dirt env
              in env {dirt = newDirtList}
+
+-- Change the environment randomly creating new Env with the same parameters
+shuffleEnv :: (Environment, StdGen) -> (Environment, StdGen)
+shuffleEnv (env, gen) =
+  let n_ = n env
+      m_ = m env
+      childrenAmount = length (children env)
+      robotsAmount = length (robots env)
+      dirtAmount = length (dirt env)
+      obstaclesAmount = length (obstacles env)
+      (newEnv, newGen) = genInitialState n_ m_ childrenAmount robotsAmount obstaclesAmount dirtAmount gen
+   in (newEnv, newGen)
