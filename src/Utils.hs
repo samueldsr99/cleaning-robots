@@ -313,3 +313,18 @@ freeCellsPercent env =
   where
     empty = fromIntegral $ emptyCells env :: Double
     dirty = fromIntegral $ dirtAmount env :: Double
+
+-- Get the available direction from a position
+getAvailableDirections :: Environment -> (Int, Int) -> [Direction]
+getAvailableDirections env pos =
+  [ direction
+    | direction <- [DUp, DRight, DDown, DLeft],
+      let adj = adjacentCell env pos direction
+       in isJust adj && canMoveRobotInPosition env pos direction
+  ]
+
+-- Get the available neighbours cells in Environment from a position, if neighbour is not available return Nothing
+-- Order is [DUp, DRight, DDown, DLeft]
+getNeighbours :: Environment -> (Int, Int) -> [(Maybe (Int, Int), Direction)]
+getNeighbours env pos =
+  [(adjacentCell env pos direction, direction) | direction <- getAvailableDirections env pos]

@@ -11,13 +11,12 @@ import Agents.Utils
     isDirty,
     isFreeCorral,
     isLoadingChild,
-    nextDirectionToBestChildToLoad,
-    nextDirectionToNearbyEmptyCorral,
-    nextDirectionToNearestDirtyCell,
+    nearestDirtyCell,
     reachableChildrenStates,
   )
+import qualified Control.Arrow as Data.Bifunctor
 import Data.Foldable (find)
-import Data.List (nub, sortOn)
+import Data.List (elemIndex, findIndex, nub, sortOn)
 import Data.Maybe (catMaybes, fromJust, isJust, isNothing)
 import Env (genInitialState)
 import System.Random (StdGen, mkStdGen)
@@ -28,11 +27,73 @@ import Types
     Dirt (Dirt),
     Environment (..),
     Obstacle (Obstacle),
+    RObjective (RObjective, opos, otype),
     Robot (..),
     RobotAction (..),
   )
 import UI (printEnvironment)
-import Utils (adjacentCell, canMoveRobotInPosition, childrenAmountInPosition, getCorralInCell, getDirtInCell, getRobotInCell, robotDirectionToAction)
+import Utils (adjacentCell, canMoveRobotInPosition, childrenAmountInPosition, getAvailableDirections, getCorralInCell, getDirtInCell, getNeighbours, getRobotInCell, robotDirectionToAction)
+
+-- Get the next direction to reach the best child to load starting at (r, c)
+nextDirectionToBestChildToLoad :: Environment -> (Int, Int) -> Maybe Direction
+nextDirectionToBestChildToLoad env (r, c) =
+  let directions = getAvailableDirections env (r, c)
+      neighbours = getNeighbours env (r, c)
+      reachableChildrenFromNeighbours =
+        [reachableChildrenStates env (fromJust pos) [] | (pos, _) <- neighbours]
+      bestChildToLoadFromNeighbours =
+        [bestChildToLoad env states | states <- reachableChildrenFromNeighbours]
+      justBestChildToLoadFromNeighbours = catMaybes bestChildToLoadFromNeighbours
+   in if null justBestChildToLoadFromNeighbours
+        then Nothing
+        else
+          let bestChild = head $ sortOn (\(BfsState pos distance) -> distance) justBestChildToLoadFromNeighbours
+              bestChildIndex = fromJust $ elemIndex (Just bestChild) bestChildToLoadFromNeighbours
+           in Just $ directions !! bestChildIndex
+
+-- Get the next direction in the path to reach the nearest dirty cell starting at (r, c)
+nextDirectionToNearestDirtyCell :: Environment -> (Int, Int) -> [(Int, Int)] -> Maybe Direction
+nextDirectionToNearestDirtyCell env (r, c) excludes =
+  let neighbours = getNeighbours env (r, c)
+      nearestDirtyCellFromNeighbours =
+        map
+          (Data.Bifunctor.first fromJust)
+          ( filter
+              (\(st, d) -> isJust st)
+              [(nearestDirtyCell env (fromJust pos) excludes, direction) | (pos, direction) <- neighbours, isJust pos]
+          )
+
+      sortedCells = sortOn (\(BfsState _ distance, _) -> distance) nearestDirtyCellFromNeighbours
+   in if null sortedCells
+        then Nothing
+        else Just $ snd $ head sortedCells
+
+nextDirectionToNearbyEmptyCorral :: Environment -> (Int, Int) -> [(Int, Int)] -> Maybe Direction
+nextDirectionToNearbyEmptyCorral env (r, c) excludes =
+  let directions = getAvailableDirections env (r, c)
+      neighbours = getNeighbours env (r, c)
+      reachablePositionsFromNeighbours =
+        [ bfs env [BfsState (fromJust pos) 0] [BfsState (fromJust pos) 0]
+          | (pos, _) <- neighbours
+        ]
+      filterCorralPositions =
+        filter
+          ( \(BfsState (r, c) _) ->
+              isFreeCorral env (r, c)
+                && (r, c) `notElem` excludes
+          )
+      freeCorralPositionsFromNeighbours = map filterCorralPositions reachablePositionsFromNeighbours
+      minFreeCorralPositionFromNeighbours =
+        catMaybes
+          [ if null x then Nothing else Just $ head (sortOn (\(BfsState _ distance) -> distance) x)
+            | x <- freeCorralPositionsFromNeighbours
+          ]
+   in if null minFreeCorralPositionFromNeighbours
+        then Nothing
+        else
+          let minDistanceCorral = head $ sortOn (\(BfsState _ distance) -> distance) minFreeCorralPositionFromNeighbours
+              minDirectionIndex = fromJust $ findIndex (isJust . find (== minDistanceCorral)) freeCorralPositionsFromNeighbours
+           in Just $ directions !! minDirectionIndex
 
 -- Action method
 getAction :: (Environment, Int) -> StdGen -> (RobotAction, StdGen)
@@ -40,7 +101,7 @@ getAction (env, index) gen
   | isLoadingChild robot && isCorral env robotPosition && (childrenAmountInPosition env robotPosition == 1) = (RDropChild, gen)
   | isLoadingChild robot && isDirty env robotPosition = (RClean, gen)
   | isLoadingChild robot =
-    let direction = nextDirectionToNearbyEmptyCorral env (position robot)
+    let direction = nextDirectionToNearbyEmptyCorral env (position robot) []
         action =
           if isJust direction
             then fromJust $ robotDirectionToAction (fromJust direction)
@@ -48,7 +109,7 @@ getAction (env, index) gen
      in (action, gen)
   | not (isLoadingChild robot) && not (anyKidOutSideCorral env) && isDirty env robotPosition = (RClean, gen)
   | not (isLoadingChild robot) && not (anyKidOutSideCorral env) && anyDirtyCell env =
-    let direction = nextDirectionToNearestDirtyCell env (position robot)
+    let direction = nextDirectionToNearestDirtyCell env (position robot) []
         action =
           if isJust direction
             then fromJust $ robotDirectionToAction (fromJust direction)
@@ -65,13 +126,3 @@ getAction (env, index) gen
   where
     robot = robots env !! index
     robotPosition = position robot
-
-test :: IO ()
-test =
-  let robot1 = Robot {idx = 1, rtype = "A", position = (1, 3), loadingChild = Just 0}
-      robot2 = Robot {idx = 2, rtype = "A", position = (0, 4), loadingChild = Nothing}
-      env = Environment {n = 10, m = 10, robotsAmount = 2, childrenAmount = 5, robots = [Robot {idx = 1, rtype = "A", position = (0, 7), loadingChild = Nothing}, Robot {idx = 2, rtype = "A", position = (5, 3), loadingChild = Just 2}], children = [Child 6 7, Child 0 8, Child 5 3, Child 1 6, Child 9 1], dirt = [Dirt 1 5, Dirt 5 8, Dirt 1 4, Dirt 2 6, Dirt 3 6, Dirt 3 4, Dirt 8 1, Dirt 4 7, Dirt 2 3, Dirt 9 0, Dirt 2 2, Dirt 2 1, Dirt 1 9, Dirt 3 1, Dirt 9 3, Dirt 4 1, Dirt 6 2, Dirt 5 3, Dirt 6 0, Dirt 6 1, Dirt 6 3, Dirt 8 0, Dirt 7 1, Dirt 7 2, Dirt 8 2], corrals = [Corral 7 3, Corral 0 8, Corral 6 7, Corral 1 6, Corral 9 6], obstacles = [Obstacle 6 5, Obstacle 7 7, Obstacle 0 9, Obstacle 7 0, Obstacle 1 8]}
-   in do
-        printEnvironment env
-        print $ getAction (env, 0) (mkStdGen 40)
-        print $ nextDirectionToBestChildToLoad env (0, 7)

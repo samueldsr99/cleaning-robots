@@ -13,7 +13,6 @@ import Types
     Dirt (Dirt),
     Environment (..),
     Obstacle (Obstacle),
-    RType,
     Robot (..),
     RobotAction (..),
   )
@@ -51,7 +50,8 @@ genInitialRobots n m robotsAmount gen =
             { idx = idx,
               rtype = "A",
               position = pos,
-              loadingChild = Nothing
+              loadingChild = Nothing,
+              objective = Nothing
             }
           | (pos, idx) <- zip robotPositions [1 .. robotsAmount]
         ]

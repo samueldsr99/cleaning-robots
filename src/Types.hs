@@ -2,7 +2,6 @@
 module Types
   ( Environment (..),
     Robot (..),
-    RType (String),
     Child (Child),
     Dirt (Dirt),
     Corral (Corral),
@@ -10,16 +9,22 @@ module Types
     ChildAction (..),
     RobotAction (..),
     Direction (..),
+    RObjective (..),
   )
 where
 
-data RType = String deriving (Show)
+data RObjective = RObjective
+  { otype :: String,
+    opos :: (Int, Int)
+  }
+  deriving (Show)
 
 data Robot = Robot
   { idx :: Int,
     rtype :: String,
     position :: (Int, Int),
-    loadingChild :: Maybe Int
+    loadingChild :: Maybe Int,
+    objective :: Maybe RObjective
   }
   deriving (Show)
 

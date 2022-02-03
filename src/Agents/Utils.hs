@@ -1,18 +1,19 @@
 module Agents.Utils where
 
 import qualified Data.Bifunctor
-import Data.List (elemIndex, find, findIndex, nub, sortOn)
-import Data.Maybe (catMaybes, fromJust, isJust, isNothing)
+import Data.List (elemIndex, find, findIndex, nub, sortOn, (\\))
+import Data.Maybe (catMaybes, fromJust, fromMaybe, isJust, isNothing)
 import Debug.Trace (trace)
 import Types
   ( Child (..),
     Direction (..),
     Dirt (Dirt),
     Environment (..),
+    RObjective (..),
     Robot (..),
     RobotAction (..),
   )
-import Utils (adjacentCell, canMoveRobot, canMoveRobotInPosition, getChildInCell, getCorralInCell, getDirtInCell)
+import Utils (adjacentCell, canMoveRobot, canMoveRobotInPosition, getAvailableDirections, getChildInCell, getCorralInCell, getDirtInCell, getNeighbours, replace)
 
 -- Rules
 
@@ -35,11 +36,21 @@ isDirty env (r, c) = isJust $ getDirtInCell env r c
 -- Check whether exists a kid outside a corral
 anyKidOutSideCorral :: Environment -> Bool
 anyKidOutSideCorral env =
-  any (\(Child r c) -> isNothing $ getCorralInCell env r c) (children env)
+  any
+    ( \(Child r c) ->
+        isNothing (getCorralInCell env r c)
+          && (r, c) `notElem` getObjectiveRelatedPositions env ["loadChild", "dropChild"]
+    )
+    (children env)
 
 -- Check whether exists a dirty cell
 anyDirtyCell :: Environment -> Bool
-anyDirtyCell env = not $ null (dirt env)
+anyDirtyCell env =
+  any
+    ( \(Dirt r c) ->
+        (r, c) `notElem` getObjectiveDirtyPositions env
+    )
+    (dirt env)
 
 -- Some other utils functions
 
@@ -66,43 +77,16 @@ bfs env visited ((BfsState curPosition curDistance) : queue) = bfs env visited' 
     visited' = visited ++ neighbours
     queue' = queue ++ neighbours
 
-nextDirectionToNearbyEmptyCorral :: Environment -> (Int, Int) -> Maybe Direction
-nextDirectionToNearbyEmptyCorral env (r, c) =
-  let availableDirections =
-        [ direction
-          | direction <- [DUp, DRight, DDown, DLeft],
-            let adj = adjacentCell env (r, c) direction
-             in isJust adj && canMoveRobotInPosition env (r, c) direction
-        ]
-      neighbours =
-        [(fromJust $ adjacentCell env (r, c) direction, direction) | direction <- availableDirections]
-      reachable_positions_from_neighbours =
-        [ bfs env [BfsState (r, c) 0] [BfsState (r, c) 0]
-          | ((r, c), _) <- neighbours
-        ]
-      filterCorralPositions = filter (\(BfsState (r, c) _) -> isFreeCorral env (r, c))
-      freeCorralPositionsFromNeighbours = map filterCorralPositions reachable_positions_from_neighbours
-      minFreeCorralPositionFromNeighbours =
-        catMaybes
-          [ if null x then Nothing else Just $ head (sortOn (\(BfsState _ distance) -> distance) x)
-            | x <- freeCorralPositionsFromNeighbours
-          ]
-   in if null minFreeCorralPositionFromNeighbours
-        then Nothing
-        else
-          let minDistanceCorral = head $ sortOn (\(BfsState _ distance) -> distance) minFreeCorralPositionFromNeighbours
-              minDirectionIndex = fromJust $ findIndex (isJust . find (== minDistanceCorral)) freeCorralPositionsFromNeighbours
-           in Just $ availableDirections !! minDirectionIndex
-
 -- Get the bfs states of all children reachable from (r, c) walking as a robot
-reachableChildrenStates :: Environment -> (Int, Int) -> [BfsState]
-reachableChildrenStates env (r, c) =
+reachableChildrenStates :: Environment -> (Int, Int) -> [(Int, Int)] -> [BfsState]
+reachableChildrenStates env (r, c) excludes =
   let states = bfs env [BfsState (r, c) 0] [BfsState (r, c) 0]
       reachableChildrenStates =
         filter
           ( \(BfsState (r, c) _) ->
               isJust (getChildInCell env r c)
                 && isNothing (getCorralInCell env r c)
+                && (r, c) `notElem` excludes
           )
           states
    in reachableChildrenStates
@@ -129,58 +113,42 @@ bestChildToLoad env childrenPositions =
   let childValue = (\(BfsState pos distanceToRobot) -> distanceToRobot + distanceToNearbyCorral env pos)
    in Just $ head $ sortOn childValue childrenPositions
 
--- Get the next direction to reach the best child to load starting at (r, c)
-nextDirectionToBestChildToLoad :: Environment -> (Int, Int) -> Maybe Direction
-nextDirectionToBestChildToLoad env (r, c) =
-  let availableDirections =
-        [ direction
-          | direction <- [DUp, DRight, DDown, DLeft],
-            let adj = adjacentCell env (r, c) direction
-             in isJust adj && canMoveRobotInPosition env (r, c) direction
-        ]
-      neighbours =
-        [(fromJust $ adjacentCell env (r, c) direction, direction) | direction <- availableDirections]
-      reachableChildrenFromNeighbours =
-        [reachableChildrenStates env pos | (pos, _) <- neighbours]
-      bestChildToLoadFromNeighbours =
-        [bestChildToLoad env states | states <- reachableChildrenFromNeighbours]
-      justBestChildToLoadFromNeighbours = catMaybes bestChildToLoadFromNeighbours
-   in if null justBestChildToLoadFromNeighbours
-        then Nothing
-        else
-          let bestChild = head $ sortOn (\(BfsState pos distance) -> distance) justBestChildToLoadFromNeighbours
-              bestChildIndex = fromJust $ elemIndex (Just bestChild) bestChildToLoadFromNeighbours
-           in Just $ availableDirections !! bestChildIndex
-
 -- Get the nearest dirty cell starting at (r, c)
-nearestDirtyCell :: Environment -> (Int, Int) -> Maybe BfsState
-nearestDirtyCell env curPos =
+nearestDirtyCell :: Environment -> (Int, Int) -> [(Int, Int)] -> Maybe BfsState
+nearestDirtyCell env curPos excludes =
   let states = bfs env [BfsState curPos 0] [BfsState curPos 0]
       dirtyCells = filter (\(BfsState (r, c) _) -> isJust $ getDirtInCell env r c) states
-   in if not (null dirtyCells)
-        then Just $ head $ sortOn (\(BfsState pos distance) -> distance) dirtyCells
+      dirtyCellsExcluded = filter (\(BfsState pos _) -> pos `notElem` excludes) dirtyCells
+   in if not (null dirtyCellsExcluded)
+        then Just $ head $ sortOn (\(BfsState pos distance) -> distance) dirtyCellsExcluded
         else Nothing
 
--- Get the next direction in the path to reach the nearest dirty cell starting at (r, c)
-nextDirectionToNearestDirtyCell :: Environment -> (Int, Int) -> Maybe Direction
-nextDirectionToNearestDirtyCell env (r, c) =
-  let availableDirections =
-        [ direction
-          | direction <- [DUp, DRight, DDown, DLeft],
-            let adj = adjacentCell env (r, c) direction
-             in isJust adj && canMoveRobotInPosition env (r, c) direction
-        ]
-      neighbours =
-        [(adjacentCell env (r, c) direction, direction) | direction <- availableDirections]
-      nearestDirtyCellFromNeighbours =
-        map
-          (Data.Bifunctor.first fromJust)
-          ( filter
-              (\(st, d) -> isJust st)
-              [(nearestDirtyCell env (fromJust pos), direction) | (pos, direction) <- neighbours, isJust pos]
-          )
+getObjectiveRelatedPositions :: Environment -> [String] -> [(Int, Int)]
+getObjectiveRelatedPositions env topics =
+  let objectives = map (\Robot {objective = _objective} -> _objective) (robots env)
+      childrenRelatedObjectives =
+        catMaybes $
+          filter
+            ( \o ->
+                isJust o && (otype (fromJust o) `elem` topics)
+            )
+            objectives
+   in map (\(RObjective _ pos) -> pos) childrenRelatedObjectives
 
-      sortedCells = sortOn (\(BfsState _ distance, _) -> distance) nearestDirtyCellFromNeighbours
-   in if null sortedCells
-        then Nothing
-        else Just $ snd $ head sortedCells
+getObjectiveChildrenPositions :: Environment -> [(Int, Int)]
+getObjectiveChildrenPositions env = getObjectiveRelatedPositions env ["loadChild"]
+
+getObjectiveDirtyPositions :: Environment -> [(Int, Int)]
+getObjectiveDirtyPositions env = getObjectiveRelatedPositions env ["cleanDirt"]
+
+getObjectiveCorralPositions :: Environment -> [(Int, Int)]
+getObjectiveCorralPositions env = getObjectiveRelatedPositions env ["dropChild"]
+
+updateRobotObjective :: (Environment, Int) -> Maybe RObjective -> Environment
+updateRobotObjective (env, index) objective_ =
+  let robot = robots env !! index
+      newRobot = robot {objective = objective_}
+   in env {robots = replace index (robots env) newRobot}
+
+cleanRobotObjective :: (Environment, Int) -> Environment
+cleanRobotObjective (env, index) = updateRobotObjective (env, index) Nothing

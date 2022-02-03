@@ -27,6 +27,7 @@ library
   exposed-modules:
       Agents.RandomAgent
       Agents.ReactiveAgent
+      Agents.IntelligentAgent
       Agents.Utils
       Env
       Simulation

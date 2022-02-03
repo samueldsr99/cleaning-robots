@@ -1,7 +1,7 @@
 -- Main module for doing simulations
 module Simulation (simulate) where
 
-import Agents.ReactiveAgent (getAction)
+import Agents.IntelligentAgent (getAction)
 import Debug.Trace (trace)
 import Env (applyRobotAction, genInitialState, moveChildRandomly, moveChildrenRandomly, shuffleEnv)
 import System.Random (StdGen, mkStdGen)
@@ -24,8 +24,8 @@ doCycle env epoch timeToShuffleEnv gen = do
   let (newEnv, newGen) = moveChildrenRandomly env gen
       processRobotAction =
         ( \(env_, gen_) index_ ->
-            let (robotAction_, newGen_) = getAction (env_, index_) gen_
-                newEnv_ = applyRobotAction (env_, index_) robotAction_
+            let (newEnv, robotAction_, newGen_) = getAction (env_, index_) gen_
+                newEnv_ = applyRobotAction (newEnv, index_) robotAction_
              in (newEnv_, newGen_)
         )
       (newEnv2, newGen2) = foldl processRobotAction (newEnv, newGen) [0 .. robotsAmount env - 1]

@@ -4,28 +4,28 @@ import Simulation (simulate)
 
 -- Simulation params
 n :: Int
-n = 10
+n = 12
 
 m :: Int
-m = 10
+m = 12
 
 children :: Int
-children = 5
+children = 7
 
 robots :: Int
 robots = 4
 
 seed :: Int
-seed = 3
+seed = 10
 
 obstacles :: Int
-obstacles = 5
+obstacles = 7
 
 dirt :: Int
-dirt = 2
+dirt = 8
 
 timeToShuffleEnv :: Int
-timeToShuffleEnv = 50
+timeToShuffleEnv = 100
 
 -- Start simulation
 main :: IO ()
