@@ -42,13 +42,13 @@ import Utils
 
 -- Initial State generations
 
-genInitialRobots :: Int -> Int -> Int -> StdGen -> ([Robot], StdGen)
-genInitialRobots n m robotsAmount gen =
+genInitialRobots :: Int -> Int -> Int -> String -> StdGen -> ([Robot], StdGen)
+genInitialRobots n m robotsAmount agentsType gen =
   let (robotPositions, newGen) = getRandomCellsInSquare n m robotsAmount gen
       robots =
         [ Robot
             { idx = idx,
-              rtype = "A",
+              rtype = agentsType,
               position = pos,
               loadingChild = Nothing,
               objective = Nothing
@@ -93,9 +93,9 @@ genInitialObstacles n m obstaclesAmount notContainingCells gen =
         newGen
       )
 
-genInitialState :: Int -> Int -> Int -> Int -> Int -> Int -> StdGen -> (Environment, StdGen)
-genInitialState n m childrenAmount robotsAmount obstaclesAmount dirtAmount gen =
-  let (robots, newGen) = genInitialRobots n m robotsAmount gen
+genInitialState :: Int -> Int -> Int -> Int -> Int -> Int -> String -> StdGen -> (Environment, StdGen)
+genInitialState n m childrenAmount robotsAmount obstaclesAmount dirtAmount agentsType  gen =
+  let (robots, newGen) = genInitialRobots n m robotsAmount agentsType gen
       robotsPositions = getRobotsPositions robots
 
       (children, newGen2) = genInitialChildren n m childrenAmount robotsPositions newGen
@@ -347,7 +347,8 @@ shuffleEnv (env, gen) =
       m_ = m env
       childrenAmount = length (children env)
       robotsAmount = length (robots env)
+      agentsType = rtype $ head (robots env)
       dirtAmount = length (dirt env)
       obstaclesAmount = length (obstacles env)
-      (newEnv, newGen) = genInitialState n_ m_ childrenAmount robotsAmount obstaclesAmount dirtAmount gen
+      (newEnv, newGen) = genInitialState n_ m_ childrenAmount robotsAmount obstaclesAmount dirtAmount agentsType gen
    in (newEnv, newGen)

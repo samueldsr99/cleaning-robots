@@ -96,33 +96,33 @@ nextDirectionToNearbyEmptyCorral env (r, c) excludes =
            in Just $ directions !! minDirectionIndex
 
 -- Action method
-getAction :: (Environment, Int) -> StdGen -> (RobotAction, StdGen)
+getAction :: (Environment, Int) -> StdGen -> (Environment, RobotAction, StdGen)
 getAction (env, index) gen
-  | isLoadingChild robot && isCorral env robotPosition && (childrenAmountInPosition env robotPosition == 1) = (RDropChild, gen)
-  | isLoadingChild robot && isDirty env robotPosition = (RClean, gen)
+  | isLoadingChild robot && isCorral env robotPosition && (childrenAmountInPosition env robotPosition == 1) = (env, RDropChild, gen)
+  | isLoadingChild robot && isDirty env robotPosition = (env, RClean, gen)
   | isLoadingChild robot =
     let direction = nextDirectionToNearbyEmptyCorral env (position robot) []
         action =
           if isJust direction
             then fromJust $ robotDirectionToAction (fromJust direction)
             else RStay
-     in (action, gen)
-  | not (isLoadingChild robot) && not (anyKidOutSideCorral env) && isDirty env robotPosition = (RClean, gen)
+     in (env, action, gen)
+  | not (isLoadingChild robot) && not (anyKidOutSideCorral env) && isDirty env robotPosition = (env, RClean, gen)
   | not (isLoadingChild robot) && not (anyKidOutSideCorral env) && anyDirtyCell env =
     let direction = nextDirectionToNearestDirtyCell env (position robot) []
         action =
           if isJust direction
             then fromJust $ robotDirectionToAction (fromJust direction)
             else RStay
-     in (action, gen)
+     in (env, action, gen)
   | not (isLoadingChild robot) && anyKidOutSideCorral env =
     let direction = nextDirectionToBestChildToLoad env (position robot)
         action =
           if isJust direction
             then fromJust $ robotDirectionToAction (fromJust direction)
             else RStay
-     in (action, gen)
-  | otherwise = (RStay, gen)
+     in (env, action, gen)
+  | otherwise = (env, RStay, gen)
   where
     robot = robots env !! index
     robotPosition = position robot

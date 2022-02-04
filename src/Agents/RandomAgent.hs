@@ -13,8 +13,8 @@ import Types
   )
 
 -- Get a random action from available actions
-getAction :: (Environment, Int) -> StdGen -> (RobotAction, StdGen)
+getAction :: (Environment, Int) -> StdGen -> (Environment, RobotAction, StdGen)
 getAction (env, index) gen =
   let availableActions = robotActions env index
       (r, newGen) = randomR (0, length availableActions - 1) gen :: (Int, StdGen)
-   in (availableActions !! r, newGen)
+   in (env, availableActions !! r, newGen)

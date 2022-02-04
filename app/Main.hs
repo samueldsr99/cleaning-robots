@@ -27,6 +27,10 @@ dirt = 8
 timeToShuffleEnv :: Int
 timeToShuffleEnv = 100
 
+-- "intelligent" | "reactive" | "random"
+agentsType :: String
+agentsType = "intelligent"
+
 -- Start simulation
 main :: IO ()
 main = do
@@ -40,4 +44,4 @@ main = do
   putStrLn $ "Time to Randomly Shuffle Environment: " ++ show timeToShuffleEnv
   putStrLn "__________________________________________\n"
 
-  simulate n m children robots obstacles dirt timeToShuffleEnv seed
+  simulate n m children robots obstacles dirt timeToShuffleEnv agentsType seed

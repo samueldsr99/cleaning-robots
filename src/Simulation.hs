@@ -1,11 +1,13 @@
 -- Main module for doing simulations
 module Simulation (simulate) where
 
-import Agents.IntelligentAgent (getAction)
+import qualified Agents.IntelligentAgent as IntelligentAgent
+import qualified Agents.ReactiveAgent as ReactiveAgent
+import qualified Agents.RandomAgent as RandomAgent
 import Debug.Trace (trace)
 import Env (applyRobotAction, genInitialState, moveChildRandomly, moveChildrenRandomly, shuffleEnv)
 import System.Random (StdGen, mkStdGen)
-import Types (Environment (robotsAmount), RobotAction (RClean, RUp))
+import Types (Environment (..), RobotAction (RClean, RUp), Robot (..))
 import UI (clearScreen, printEnvironment)
 import Utils (dirtAmount, emptyCells, freeCellsPercent, getRandomCellsInSquareNotContaining)
 
@@ -24,7 +26,13 @@ doCycle env epoch timeToShuffleEnv gen = do
   let (newEnv, newGen) = moveChildrenRandomly env gen
       processRobotAction =
         ( \(env_, gen_) index_ ->
-            let (newEnv, robotAction_, newGen_) = getAction (env_, index_) gen_
+            let robot = robots env_ !! index_
+                rtype_ = rtype robot
+                actionFunction
+                  | rtype_ == "intelligent" = IntelligentAgent.getAction
+                  | rtype_ == "reactive" = ReactiveAgent.getAction
+                  | otherwise = RandomAgent.getAction
+                (newEnv, robotAction_, newGen_) = actionFunction (env_, index_) gen_
                 newEnv_ = applyRobotAction (newEnv, index_) robotAction_
              in (newEnv_, newGen_)
         )
@@ -35,8 +43,8 @@ doCycle env epoch timeToShuffleEnv gen = do
           else (newEnv2, newGen2)
    in doCycle newEnv3 (epoch + 1) timeToShuffleEnv newGen3
 
-simulate :: Int -> Int -> Int -> Int -> Int -> Int -> Int -> Int -> IO ()
-simulate n m children robots obstacles dirt timeToShuffleEnv seed =
+simulate :: Int -> Int -> Int -> Int -> Int -> Int -> Int -> String -> Int -> IO ()
+simulate n m children robots obstacles dirt timeToShuffleEnv agentsType seed =
   let gen = mkStdGen seed
-      (initialState, newGen) = genInitialState n m children robots obstacles dirt gen
-   in doCycle initialState 0 timeToShuffleEnv newGen
+      (initialState, newGen) = genInitialState n m children robots obstacles dirt agentsType gen
+   in doCycle initialState 1 timeToShuffleEnv newGen
